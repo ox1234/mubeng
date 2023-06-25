@@ -41,7 +41,7 @@ func (p *ProxyManager) Watch() (*fsnotify.Watcher, error) {
 func (p *ProxyManager) Reload() error {
 	i := p.CurrentIndex
 
-	p, err := New(p.filepath)
+	p, err := New(p.filepath, p.Remote)
 	if err != nil {
 		return err
 	}

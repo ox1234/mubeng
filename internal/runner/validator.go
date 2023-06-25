@@ -8,6 +8,7 @@ import (
 
 	"ktbs.dev/mubeng/common"
 	"ktbs.dev/mubeng/internal/proxymanager"
+	"ktbs.dev/mubeng/internal/util"
 )
 
 // validate user-supplied option values before Runner.
@@ -15,15 +16,17 @@ func validate(opt *common.Options) error {
 	var err error
 
 	if opt.File == "" {
-		return errors.New("no proxy file provided")
+		return errors.New("no proxy file or url provided")
 	}
 
-	opt.File, err = filepath.Abs(opt.File)
-	if err != nil {
-		return err
+	if !util.CheckIsHttpLocation(opt.File) {
+		opt.File, err = filepath.Abs(opt.File)
+		if err != nil {
+			return err
+		}
 	}
 
-	opt.ProxyManager, err = proxymanager.New(opt.File)
+	opt.ProxyManager, err = proxymanager.New(opt.File, util.CheckIsHttpLocation(opt.File))
 	if err != nil {
 		return err
 	}

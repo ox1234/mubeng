@@ -21,66 +21,37 @@ func (p *Proxy) onRequest(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Reque
 		defer mutex.Unlock()
 	}
 
-	// Rotate proxy IP for every AFTER request
-	if (rotate == "") || (ok >= p.Options.Rotate) {
-		if p.Options.Method == "sequent" {
-			rotate = p.Options.ProxyManager.NextProxy()
-		}
-
-		if p.Options.Method == "random" {
-			rotate = p.Options.ProxyManager.RandomProxy()
-		}
-
-		if ok >= p.Options.Rotate {
-			ok = 1
-		}
-	} else {
-		ok++
-	}
-
-	rotate = helper.EvalFunc(rotate)
 	resChan := make(chan interface{})
 
 	go func() {
 		if (req.URL.Scheme != "http") && (req.URL.Scheme != "https") {
-			resChan <- fmt.Errorf("Unsupported protocol scheme: %s", req.URL.Scheme)
+			resChan <- fmt.Errorf("unsupported protocol scheme: %s", req.URL.Scheme)
 			return
 		}
 
 		log.Debugf("%s %s %s", req.RemoteAddr, req.Method, req.URL)
 
-		tr, err := mubeng.Transport(rotate)
-		if err != nil {
-			resChan <- err
+		for _, proxy := range p.Options.ProxyManager.Proxies {
+			log.Infof("try request %s with %s", req.URL.String(), proxy)
+			resp, err := p.doRequestWithProxy(req, helper.EvalFunc(proxy))
+			if err != nil {
+				log.Warnf("do %s through %s request fail: %s", req.URL.String(), proxy, err)
+				continue
+			}
+			if resp.StatusCode == 501 {
+				log.Warnf("proxy return not valid")
+				continue
+			}
+
+			resChan <- resp
 			return
 		}
 
-		proxy := &mubeng.Proxy{
-			Address:   rotate,
-			Transport: tr,
-		}
-
-		client, req = proxy.New(req)
-		client.Timeout = p.Options.Timeout
-		if p.Options.Verbose {
-			client.Transport = dump.RoundTripper(tr)
-		}
-
-		resp, err := client.Do(req)
+		resp, err := p.doRequestWithProxy(req, "")
 		if err != nil {
-			resChan <- err
+			resChan <- fmt.Errorf("no proxy can request %s url", req.URL.String())
 			return
 		}
-		defer resp.Body.Close()
-
-		buf, err := io.ReadAll(resp.Body)
-		if err != nil {
-			resChan <- err
-			return
-		}
-
-		resp.Body = io.NopCloser(bytes.NewBuffer(buf))
-
 		resChan <- resp
 	}()
 
@@ -98,6 +69,43 @@ func (p *Proxy) onRequest(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Reque
 	}
 
 	return req, resp
+}
+
+func (p *Proxy) doRequestWithProxy(req *http.Request, rotate string) (*http.Response, error) {
+	var client *http.Client
+	if rotate == "" {
+		proxy := &mubeng.Proxy{}
+		client, req = proxy.New(req)
+	} else {
+		tr, err := mubeng.Transport(rotate)
+		if err != nil {
+			return nil, fmt.Errorf("construct transport fail: %s", err)
+		}
+		proxy := &mubeng.Proxy{
+			Address:   rotate,
+			Transport: tr,
+		}
+		client, req = proxy.New(req)
+		if p.Options.Verbose {
+			client.Transport = dump.RoundTripper(tr)
+		}
+	}
+
+	client.Timeout = p.Options.Timeout
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("do request fail: %s", err)
+	}
+	defer resp.Body.Close()
+
+	buf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response body fail: %s", err)
+	}
+
+	resp.Body = io.NopCloser(bytes.NewBuffer(buf))
+	return resp, nil
 }
 
 // onConnect handles CONNECT method

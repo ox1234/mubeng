@@ -27,16 +27,13 @@ func Do(opt *common.Options) {
 
 		p.Go(func() {
 			addr, err := check(address, opt.Timeout)
-			if len(opt.Countries) > 0 && !isMatchCC(opt.Countries, addr.Country) {
-				return
-			}
 
 			if err != nil {
 				if opt.Verbose {
 					fmt.Printf("[%s] %s\n", aurora.Red("DIED"), address)
 				}
 			} else {
-				fmt.Printf("[%s] [%s] [%s] %s\n", aurora.Green("LIVE"), aurora.Magenta(addr.Country), aurora.Cyan(addr.IP), address)
+				fmt.Printf("[%s] [%s] %s\n", aurora.Green("LIVE"), aurora.Cyan(addr.Data.IpAddr), address)
 
 				if opt.Output != "" {
 					fmt.Fprintf(opt.Result, "%s\n", address)

@@ -8,5 +8,5 @@ var (
 	client *http.Client
 	ipinfo IPInfo
 
-	endpoint = "https://ipinfo.io/json"
+	endpoint = "https://security.bilibili.com/412"
 )

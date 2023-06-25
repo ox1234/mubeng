@@ -1,13 +1,11 @@
 package checker
 
 type IPInfo struct {
-	City     string `json:"city"`
-	Country  string `json:"country"`
-	Hostname string `json:"hostname"`
-	IP       string `json:"ip"`
-	Loc      string `json:"loc"`
-	Org      string `json:"org"`
-	Readme   string `json:"readme"`
-	Region   string `json:"region"`
-	Timezone string `json:"timezone"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Ttl     int    `json:"ttl"`
+	Data    struct {
+		IpAddr string `json:"ip_addr"`
+		Mid    string `json:"mid"`
+	} `json:"data"`
 }
